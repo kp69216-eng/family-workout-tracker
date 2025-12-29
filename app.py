@@ -32,6 +32,7 @@ st.title("🏃 Family Fitness Tracker")
 
 tab1, tab2 = st.tabs(["📝 Log Workout", "📊 View Stats"])
 
+# --- TAB 1: LOGGING DATA ---
 with tab1:
     st.header("Quick Log")
     
@@ -41,23 +42,24 @@ with tab1:
     ]
 
     with st.form("workout_form", clear_on_submit=True):
-        user = st.selectbox("Who are you?", ["Me", "Mom", "Dad"])
+        # Updated names as requested
+        user = st.selectbox("Who are you?", ["Krishna", "Sankar", "Jayanthi"])
         activity = st.selectbox("What did you do?", workout_categories)
         mins = st.number_input("Duration (minutes)", min_value=1, step=5, value=30)
         date = st.date_input("Date", datetime.now().date())
         
-        # New Optional Notes Box
-        notes = st.text_input("Notes (Optional)", placeholder="How was it?")
+        # Optional Notes Box
+        notes = st.text_input("Notes (Optional)", placeholder="How did it go?")
         
         if st.form_submit_button("Save Workout"):
-            # Append 5 items now: Date, Name, Workout, Duration, Notes
             worksheet.append_row([str(date), user, activity, mins, notes])
             st.success(f"Logged {activity} for {user}!")
             st.rerun()
 
+# --- TAB 2: CALCULATING STATS ---
 with tab2:
     if df.empty:
-        st.info("No data found yet.")
+        st.info("No data found yet. Start moving!")
     else:
         today = datetime.now().date()
         start_of_week = today - timedelta(days=today.weekday())
@@ -66,8 +68,8 @@ with tab2:
         df_weekly = df[df['Date'] >= start_of_week]
         df_monthly = df[df['Date'] >= start_of_month]
 
-        # --- DAYS ACTIVE STATS ---
-        st.header("📅 Workout Days")
+        # 1. DAYS ACTIVE STATS
+        st.header("📅 Consistency (Days Active)")
         
         def get_day_counts(dataframe):
             if dataframe.empty: return pd.Series(dtype=int)
@@ -79,15 +81,17 @@ with tab2:
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("This Week")
-            for name in ["Me", "Mom", "Dad"]:
-                st.write(f"**{name}**: {weekly_days.get(name, 0)} / 7 days")
+            for name in ["Krishna", "Sankar", "Jayanthi"]:
+                d = weekly_days.get(name, 0)
+                st.write(f"**{name}**: {d} / 7 days")
         
         with col2:
             st.subheader("This Month")
-            for name in ["Me", "Mom", "Dad"]:
-                st.write(f"**{name}**: {monthly_days.get(name, 0)} days total")
+            for name in ["Krishna", "Sankar", "Jayanthi"]:
+                d = monthly_days.get(name, 0)
+                st.write(f"**{name}**: {d} days")
 
-        # --- LEADERBOARD ---
+        # 2. LEADERBOARD (Total Minutes)
         st.divider()
         st.header("🏆 Minutes Leaderboard")
         leaderboard = df_weekly.groupby('Name')['Duration'].sum().sort_values(ascending=False)
@@ -96,9 +100,9 @@ with tab2:
             for i, (name, total) in enumerate(leaderboard.items()):
                 medal = ["🥇", "🥈", "🥉"][i] if i < 3 else "🏃"
                 st.write(f"{medal} **{name}**: {total} mins this week")
-        
-        # --- HISTORY ---
+
+        # 3. FULL HISTORY
         st.divider()
         with st.expander("Show Full History & Notes"):
-            # Sorting history so newest is at the top
+            # Sorting newest to oldest
             st.dataframe(df.sort_values(by="Date", ascending=False), use_container_width=True)
