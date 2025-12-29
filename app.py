@@ -24,78 +24,101 @@ except Exception as e:
 raw_data = worksheet.get_all_records()
 df = pd.DataFrame(raw_data)
 if not df.empty:
-    df['Date'] = pd.to_datetime(df['Date']).dt.date # Keep only the date part
+    # Ensure Date column is handled correctly
+    df['Date'] = pd.to_datetime(df['Date']).dt.date
 
 # --- 3. APP INTERFACE ---
-st.set_page_config(page_title="Family Fitness", page_icon="🏆")
+st.set_page_config(page_title="Family Fitness Tracker", page_icon="🏆", layout="centered")
 st.title("🏃 Family Fitness Tracker")
 
 tab1, tab2 = st.tabs(["📝 Log Workout", "📊 View Stats"])
 
+# --- TAB 1: LOGGING DATA ---
 with tab1:
     st.header("New Entry")
+    
+    # Logic to build the dropdown list
     default_options = ["Walking", "Running", "Cycling", "Gym", "Yoga"]
     if not df.empty and 'Workout' in df.columns:
-        all_options = df['Workout'].value_counts().index.tolist()
-        all_options = all_options + [x for x in default_options if x not in all_options]
+        existing_workouts = df['Workout'].unique().tolist()
+        all_options = sorted(list(set(existing_workouts + default_options)))
     else:
-        all_options = default_options
+        all_options = sorted(default_options)
+    
+    all_options.append("➕ Add New...")
 
     with st.form("workout_form", clear_on_submit=True):
         user = st.selectbox("Who are you?", ["Me", "Mom", "Dad"])
-        activity = st.selectbox("Activity", all_options + ["Add New..."])
-        new_activity = st.text_input("New activity name") if activity == "Add New..." else ""
+        
+        activity_choice = st.selectbox("Activity", all_options)
+        
+        # This box appears instantly if "Add New..." is selected
+        new_activity_name = ""
+        if activity_choice == "➕ Add New...":
+            new_activity_name = st.text_input("Enter the new activity name:")
+            
         mins = st.number_input("Duration (minutes)", min_value=1, value=30)
         date = st.date_input("Date", datetime.now().date())
         
         if st.form_submit_button("Save Workout"):
-            final_act = new_activity if activity == "Add New..." else activity
-            if final_act:
+            final_act = new_activity_name if activity_choice == "➕ Add New..." else activity_choice
+            
+            if not final_act:
+                st.error("Please provide an activity name!")
+            else:
                 worksheet.append_row([str(date), user, final_act, mins])
-                st.success("Logged!")
+                st.success(f"Successfully logged {final_act}!")
                 st.rerun()
 
+# --- TAB 2: CALCULATING STATS ---
 with tab2:
     if df.empty:
-        st.info("No logs yet! Start moving!")
+        st.info("No data found yet. Go log a workout!")
     else:
-        st.header("📅 Consistency Tracker")
-        
-        # Calculate current dates
+        # 1. TIME CALCULATIONS
         today = datetime.now().date()
         start_of_week = today - timedelta(days=today.weekday()) # Monday
         start_of_month = today.replace(day=1)
 
-        # Filters for analysis
         df_weekly = df[df['Date'] >= start_of_week]
         df_monthly = df[df['Date'] >= start_of_month]
 
-        # Function to count unique days per person
+        # 2. FREQUENCY STATS (Number of Days)
+        st.header("📅 Consistency (Days Active)")
+        
         def get_day_counts(dataframe):
+            if dataframe.empty: return pd.Series(dtype=int)
             return dataframe.groupby('Name')['Date'].nunique()
 
         weekly_days = get_day_counts(df_weekly)
         monthly_days = get_day_counts(df_monthly)
 
-        # --- Display Stats ---
         col1, col2 = st.columns(2)
-        
         with col1:
-            st.subheader("Days This Week")
+            st.subheader("This Week")
             for name in ["Me", "Mom", "Dad"]:
-                count = weekly_days.get(name, 0)
-                st.write(f"**{name}**: {count} / 7 days")
+                d = weekly_days.get(name, 0)
+                st.write(f"**{name}**: {d} / 7 days")
         
         with col2:
-            st.subheader("Days This Month")
+            st.subheader("This Month")
             for name in ["Me", "Mom", "Dad"]:
-                count = monthly_days.get(name, 0)
-                st.write(f"**{name}**: {count} days total")
+                d = monthly_days.get(name, 0)
+                st.write(f"**{name}**: {d} days")
 
+        # 3. LEADERBOARD (Total Minutes)
         st.divider()
-        st.subheader("🔥 Habit Strength")
-        # Visualizing monthly consistency
-        st.bar_chart(monthly_days)
+        st.header("🏆 Minutes Leaderboard")
+        leaderboard = df_weekly.groupby('Name')['Duration'].sum().sort_values(ascending=False)
+        
+        if not leaderboard.empty:
+            for i, (name, total) in enumerate(leaderboard.items()):
+                medal = ["🥇", "🥈", "🥉"][i] if i < 3 else "🏃"
+                st.write(f"{medal} **{name}**: {total} mins this week")
+        else:
+            st.write("No workouts this week yet!")
 
-        with st.expander("Show Full History"):
+        # 4. RAW HISTORY
+        st.divider()
+        with st.expander("See Raw History"):
             st.dataframe(df.sort_values(by="Date", ascending=False), use_container_width=True)
