@@ -7,7 +7,11 @@ from datetime import datetime, timedelta
 # --- 1. CONNECTION SETUP ---
 # This part looks for your Google Secrets in the Streamlit Dashboard
 try:
-    scope = ["https://www.googleapis.com/auth/spreadsheets"]
+    # Change your scope line to look like this:
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
     # If running on Streamlit Cloud, use Secrets. If local, use creds.json
     if "gcp_service_account" in st.secrets:
         creds_dict = dict(st.secrets["gcp_service_account"])
